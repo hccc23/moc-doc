@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Trình đọc và định dạng chương truyện từ file TXT, chạy hoàn toàn trên thiết bị.">
+  <title>Mộc Đọc — Trình đọc truyện TXT</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23214c3d'/%3E%3Cpath d='M17 17h12c4 0 7 2 9 5 2-3 5-5 9-5v30c-4 0-7 1-9 4-2-3-5-4-9-4H17z' fill='%23fffdf8'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      --green: #214c3d;
+      --green-deep: #15372c;
+      --accent: #a85f39;
+      --page: #f5f0e7;
+      --surface: #fffdf8;
+      --text: #252621;
+      --muted: #77776f;
+      --border: rgba(33, 76, 61, .15);
+      --reader-width: 760px;
+      --reader-size: 20px;
+      --reader-leading: 1.85;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at 8% 8%, rgba(255,255,255,.75), transparent 28rem), var(--page);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      transition: color .18s ease, background-color .18s ease;
+    }
+    body[data-theme="paper"] {
+      --page: #f6f3ed; --surface: #fffefa; --text: #20231f; --muted: #71756d;
+      --border: rgba(32,35,31,.13);
+    }
+    body[data-theme="sepia"] {
+      --page: #eee4d1; --surface: #f8f0df; --text: #3c3025; --muted: #7f6b58;
+      --border: rgba(83,61,40,.16);
+    }
+    body[data-theme="night"] {
+      --page: #101915; --surface: #17231e; --text: #dcded6; --muted: #8e9d94;
+      --border: rgba(218,229,220,.12); --green: #7faf95; --green-deep: #9bc5aa;
+      background: radial-gradient(circle at 8% 8%, rgba(54,88,70,.2), transparent 30rem), var(--page);
+    }
+    button, input { font: inherit; }
+    button { color: inherit; }
+    [hidden] { display: none !important; }
+    .visually-hidden {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
+    .progress {
+      position: fixed; inset: 0 auto auto 0; z-index: 100; width: 0; height: 3px;
+      background: #c57646; transition: width .08s linear;
+    }
+    .topbar {
+      position: sticky; top: 0; z-index: 30; display: grid;
+      grid-template-columns: 1fr auto 1fr; align-items: center; min-height: 72px;
+      padding: 12px clamp(20px, 4vw, 64px); border-bottom: 1px solid var(--border);
+      background: color-mix(in srgb, var(--surface) 90%, transparent); backdrop-filter: blur(18px);
+    }
+    .brand {
+      justify-self: start; display: inline-flex; align-items: center; gap: 10px;
+      border: 0; background: none; font: 700 21px Georgia, serif; cursor: pointer;
+    }
+    .brand-mark {
+      display: grid; place-items: center; width: 34px; height: 34px;
+      border-radius: 50% 50% 50% 12%; transform: rotate(-12deg);
+      background: var(--green); color: var(--surface); font-size: 17px;
+    }
+    .toolbar {
+      display: flex; align-items: center; gap: 5px; padding: 5px;
+      border: 1px solid var(--border); border-radius: 999px;
+      background: color-mix(in srgb, var(--page) 58%, transparent);
+    }
+    .tool, .theme-button {
+      display: grid; place-items: center; min-width: 32px; height: 32px; padding: 0 7px;
+      border: 0; border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer;
+    }
+    .tool:hover, .theme-button:hover, .theme-button.active {
+      background: var(--surface); color: var(--green-deep); box-shadow: 0 2px 10px rgba(30,45,36,.08);
+    }
+    .divider { width: 1px; height: 21px; margin: 0 3px; background: var(--border); }
+    .font-picker select {
+      width: 118px; height: 32px; padding: 0 25px 0 10px; border: 0; border-radius: 999px;
+      background: var(--surface); color: var(--green-deep); font-size: 12px;
+      font-weight: 650; cursor: pointer;
+    }
+    .font-picker select:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+    .font-value { min-width: 21px; color: var(--muted); font-size: 11px; text-align: center; }
+    .range { display: flex; align-items: center; gap: 4px; padding: 0 7px; color: var(--muted); font-size: 13px; }
+    .range input { width: 56px; accent-color: var(--green); cursor: pointer; }
+    .open-button {
+      justify-self: end; min-height: 42px; padding: 0 17px;
+      border: 1px solid color-mix(in srgb, var(--green) 38%, transparent); border-radius: 999px;
+      background: transparent; color: var(--green-deep); font-size: 14px; font-weight: 650; cursor: pointer;
+    }
+    .open-button:hover { background: var(--green); color: var(--surface); }
+    .welcome {
+      display: grid; grid-template-columns: minmax(0,.9fr) minmax(360px,.7fr);
+      align-items: center; gap: clamp(54px,8vw,130px); width: min(1180px,calc(100% - 48px));
+      min-height: calc(100vh - 72px); margin: 0 auto; padding: 72px 0 96px;
+    }
+    .welcome-copy .eyebrow, .chapter-heading .eyebrow {
+      margin: 0 0 20px; color: var(--accent); font-size: 12px; font-weight: 750;
+      letter-spacing: .18em; text-transform: uppercase;
+    }
+    .welcome h1 {
+      margin: 0; color: var(--green-deep); font: 500 clamp(48px,6vw,82px)/1.02 Georgia, serif;
+      letter-spacing: -.045em;
+    }
+    .intro { max-width: 585px; margin: 30px 0 36px; color: var(--muted); font-size: 17px; line-height: 1.75; }
+    .privacy { display: flex; align-items: center; gap: 15px; padding-top: 26px; border-top: 1px solid var(--border); }
+    .privacy-icon {
+      display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 auto;
+      border-radius: 50%; background: color-mix(in srgb,var(--green) 10%,transparent);
+      color: var(--green-deep); font-size: 24px;
+    }
+    .privacy strong { display: block; margin-bottom: 3px; color: var(--green-deep); font-size: 13px; }
+    .privacy p { margin: 0; color: var(--muted); font-size: 12px; }
+    .drop-card {
+      display: flex; flex-direction: column; align-items: center; min-height: 420px;
+      padding: 58px 42px 42px; border: 1.5px dashed color-mix(in srgb,var(--green) 32%,transparent);
+      border-radius: 26px; outline: 9px solid color-mix(in srgb,var(--surface) 70%,transparent);
+      background: color-mix(in srgb,var(--surface) 88%,transparent); text-align: center; cursor: pointer;
+      box-shadow: 0 25px 70px rgba(38,52,41,.08); transition: transform .18s ease, border-color .18s ease;
+    }
+    .drop-card:hover, .drop-card:focus-visible { transform: translateY(-5px); border-color: var(--green); }
+    .paper {
+      position: relative; width: 92px; height: 112px; margin-bottom: 31px; padding: 24px 17px;
+      border: 1px solid var(--border); border-radius: 7px; background: var(--surface);
+      box-shadow: -10px 8px 0 -3px var(--page), -11px 9px 0 -3px var(--border), 0 14px 28px rgba(43,58,48,.1);
+    }
+    .paper i { display: block; height: 2px; margin-bottom: 8px; background: var(--border); }
+    .paper b { display: block; margin-top: 21px; color: var(--accent); font: 700 13px ui-monospace, monospace; letter-spacing: .13em; }
+    .drop-card h2 { margin: 0 0 8px; color: var(--green-deep); font: 600 23px Georgia,serif; }
+    .drop-card > p { margin: 0 0 23px; color: var(--muted); font-size: 14px; }
+    .file-limit {
+      padding: 7px 12px; border-radius: 999px; background: color-mix(in srgb,var(--green) 7%,transparent);
+      color: var(--muted); font-size: 10px; letter-spacing: .05em; text-transform: uppercase;
+    }
+    .error { margin-top: 16px; color: #b3483e; font-size: 13px; }
+    .sample {
+      grid-column: 1/-1; justify-self: center; margin-top: -12px; border: 0; background: none;
+      color: var(--muted); font-size: 13px; cursor: pointer;
+    }
+    .sample span { color: var(--green-deep); font-weight: 650; }
+    .reader { width: min(var(--reader-width),calc(100% - 40px)); margin: 0 auto; padding: clamp(66px,9vw,120px) 0 100px; }
+    .chapter-heading { padding-bottom: 47px; border-bottom: 1px solid var(--border); text-align: center; }
+    .chapter-heading h1 { margin: 0; color: var(--green-deep); font: 500 clamp(36px,6vw,58px)/1.16 Georgia,serif; letter-spacing: -.035em; }
+    .meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 24px; color: var(--muted); font-size: 12px; }
+    .chapter-body { padding-top: 52px; font-size: var(--reader-size); line-height: var(--reader-leading); text-rendering: optimizeLegibility; }
+    .chapter-body.georgia { font-family: Georgia,"Times New Roman",serif; }
+    .chapter-body.palatino { font-family: Palatino,"Palatino Linotype","Book Antiqua",Georgia,serif; }
+    .chapter-body.times { font-family: "Times New Roman",Times,serif; }
+    .chapter-body.segoe { font-family: "Segoe UI",Tahoma,ui-sans-serif,sans-serif; letter-spacing: .006em; }
+    .chapter-body.arial { font-family: Arial,Helvetica,ui-sans-serif,sans-serif; letter-spacing: .006em; }
+    .chapter-body p { margin: 0 0 1.18em; }
+    .chapter-body p:first-child::first-letter {
+      float: left; margin: .1em .11em 0 0; color: var(--green-deep);
+      font: 500 3.45em/.78 Georgia,serif;
+    }
+    .chapter-end { margin-top: 78px; padding-top: 46px; border-top: 1px solid var(--border); text-align: center; }
+    .chapter-end .ornament { color: var(--accent); }
+    .chapter-end p { margin: 12px 0 24px; color: var(--muted); font: italic 16px Georgia,serif; }
+    .chapter-end button { padding: 12px 19px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--green-deep); cursor: pointer; }
+    .drop-overlay {
+      position: fixed; inset: 0; z-index: 90; display: grid; place-items: center;
+      background: color-mix(in srgb,var(--green-deep) 88%,transparent); color: #fffdf8;
+      opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .14s ease;
+    }
+    body.dragging .drop-overlay { opacity: 1; visibility: visible; }
+    .drop-overlay div { width: min(460px,calc(100% - 40px)); padding: 70px 40px; border: 1px dashed rgba(255,255,255,.55); border-radius: 24px; text-align: center; }
+    .drop-overlay strong { display: block; font: 500 29px Georgia,serif; }
+    .drop-overlay p { color: rgba(255,255,255,.68); font-size: 13px; }
+    @media (max-width: 900px) {
+      .topbar { grid-template-columns: 1fr auto; }
+      .toolbar { position: fixed; right: 14px; bottom: 14px; left: 14px; z-index: 40; justify-content: center; background: var(--surface); box-shadow: 0 10px 40px rgba(18,31,24,.16); }
+      .welcome { grid-template-columns: 1fr; width: min(680px,calc(100% - 42px)); padding-bottom: 110px; }
+      .sample { margin-top: -24px; }
+      .reader { padding-bottom: 130px; }
+    }
+    @media (max-width: 560px) {
+      .topbar { min-height: 64px; padding: 10px 16px; }
+      .brand { font-size: 18px; } .brand-mark { width: 31px; height: 31px; }
+      .open-button { min-height: 38px; padding: 0 13px; font-size: 12px; }
+      .welcome { width: calc(100% - 32px); padding-top: 52px; }
+      .welcome h1 { font-size: clamp(40px,13vw,58px); }
+      .intro { font-size: 15px; }
+      .drop-card { min-height: 360px; padding: 50px 22px 34px; }
+      .range { display: none; }
+      .font-picker select { width: 105px; }
+      .reader { width: calc(100% - 34px); padding-top: 60px; }
+      .chapter-body { padding-top: 38px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+  </style>
+</head>
+<body data-theme="paper">
+  <div id="progress" class="progress"></div>
+  <input id="file-input" class="visually-hidden" type="file" accept=".txt,text/plain">
+  <header class="topbar">
+    <button id="brand" class="brand" type="button"><span class="brand-mark">M</span><span>Mộc Đọc</span></button>
+    <div class="toolbar" aria-label="Tùy chỉnh trình đọc">
+      <button class="theme-button active" data-theme="paper" type="button" title="Giao diện sáng">○</button>
+      <button class="theme-button" data-theme="sepia" type="button" title="Giao diện sepia">◐</button>
+      <button class="theme-button" data-theme="night" type="button" title="Giao diện tối">●</button>
+      <span class="divider"></span>
+      <label class="font-picker" title="Font đọc truyện"><span class="visually-hidden">Font đọc truyện</span><select id="font-family" aria-label="Font đọc truyện"><option value="georgia">Georgia</option><option value="palatino">Palatino</option><option value="times">Times New Roman</option><option value="segoe">Segoe UI</option><option value="arial">Arial</option></select></label>
+      <button id="font-down" class="tool" type="button" title="Giảm cỡ chữ">A−</button>
+      <span id="font-value" class="font-value">20</span>
+      <button id="font-up" class="tool" type="button" title="Tăng cỡ chữ">A+</button>
+      <label class="range" title="Độ rộng trang đọc">↔ <input id="width" type="range" min="600" max="960" step="40" value="760" aria-label="Độ rộng trang đọc"></label>
+      <label class="range" title="Giãn dòng">↕ <input id="leading" type="range" min="1.45" max="2.2" step=".05" value="1.85" aria-label="Giãn dòng"></label>
+    </div>
+    <button id="open-file" class="open-button" type="button">＋ <span>Mở file</span></button>
+  </header>
+
+  <main id="welcome" class="welcome">
+    <section class="welcome-copy">
+      <p class="eyebrow">Một góc đọc thật yên</p>
+      <h1>Đưa chương truyện<br>về đúng dáng của nó.</h1>
+      <p class="intro">Thả file TXT vào đây. Mộc Đọc sẽ tự tách đoạn, nhận diện tiêu đề và dàn trang lại thành một trải nghiệm đọc thoải mái hơn.</p>
+      <div class="privacy"><span class="privacy-icon">⌁</span><div><strong>Riêng tư ngay từ đầu</strong><p>Nội dung được xử lý trên thiết bị này, không gửi đi đâu cả.</p></div></div>
+    </section>
+    <section id="drop-card" class="drop-card" role="button" tabindex="0" aria-label="Chọn file TXT">
+      <div class="paper" aria-hidden="true"><i></i><i></i><i></i><b>TXT</b></div>
+      <h2>Thả file TXT vào đây</h2>
+      <p>hoặc bấm để chọn từ máy</p>
+      <span class="file-limit">Tối đa 10 MB · UTF-8 / Windows-1258</span>
+      <div id="error" class="error" hidden></div>
+    </section>
+    <button id="sample" class="sample" type="button">Chưa có file? <span>Đọc thử một chương mẫu →</span></button>
+  </main>
+
+  <main id="reader" class="reader" hidden>
+    <section class="chapter-heading">
+      <p class="eyebrow">Đang đọc</p>
+      <h1 id="chapter-title"></h1>
+      <div class="meta"><span id="word-count"></span><span>•</span><span id="read-time"></span><span>•</span><span id="encoding"></span></div>
+    </section>
+    <article id="chapter-body" class="chapter-body georgia"></article>
+    <footer class="chapter-end"><span class="ornament">✦</span><p>Hết chương</p><button id="next-file" type="button">Mở chương tiếp theo</button></footer>
+  </main>
+
+  <div class="drop-overlay" aria-hidden="true"><div><strong>Thả file để bắt đầu đọc</strong><p>Chỉ nhận file .txt</p></div></div>
+
+  <script>
+    (() => {
+      "use strict";
+      const $ = (id) => document.getElementById(id);
+      const root = document.documentElement;
+      const body = document.body;
+      const input = $("file-input");
+      const welcome = $("welcome");
+      const reader = $("reader");
+      const chapterBody = $("chapter-body");
+      let currentKey = "";
+      let dragDepth = 0;
+      const settings = { theme: "paper", fontSize: 20, leading: 1.85, width: 760, fontFamily: "georgia" };
+      const sample = `Chương 12: Lá thư không gửi\n\nMưa bắt đầu từ lúc thành phố vừa lên đèn. Những giọt nước mảnh như tơ nghiêng qua khung cửa, làm mọi thứ ngoài kia nhòe thành một bức tranh màu lam.\n\nAn đặt tách trà xuống, mở ngăn kéo cuối cùng của chiếc bàn gỗ. Lá thư vẫn ở đó — gấp làm tư, không đề tên người nhận.\n\n“Có những điều, viết ra rồi cũng chưa chắc đã nhẹ lòng hơn.”\n\nCô đọc lại câu đầu tiên. Mực đã phai đôi chút, nhưng buổi chiều mùa hạ năm ấy vẫn hiện lên rõ ràng: tiếng ve, con đường đầy nắng, và một lời hẹn chẳng ai đủ can đảm để nhắc lại.\n\nNgoài hiên, tiếng mưa bỗng chậm. An mỉm cười, gấp lá thư lại và đặt nó vào túi áo.\n\nLần này, cô sẽ mang nó đi.`;
+
+      const storage = {
+        get(key) { try { return localStorage.getItem(key); } catch { return null; } },
+        set(key, value) { try { localStorage.setItem(key, value); } catch {} }
+      };
+
+      function saveSettings() { storage.set("mocdoc-settings", JSON.stringify(settings)); }
+      function applySettings() {
+        body.dataset.theme = settings.theme;
+        root.style.setProperty("--reader-size", settings.fontSize + "px");
+        root.style.setProperty("--reader-leading", settings.leading);
+        root.style.setProperty("--reader-width", settings.width + "px");
+        $("font-value").textContent = settings.fontSize;
+        $("width").value = settings.width;
+        $("leading").value = settings.leading;
+        chapterBody.className = "chapter-body " + settings.fontFamily;
+        $("font-family").value = settings.fontFamily;
+        document.querySelectorAll(".theme-button").forEach((button) => button.classList.toggle("active", button.dataset.theme === settings.theme));
+      }
+      try { Object.assign(settings, JSON.parse(storage.get("mocdoc-settings") || "{}")); } catch {}
+      applySettings();
+
+      function score(text) {
+        return (text.match(/�/g) || []).length * 12 + (text.match(/Ã|Â|Æ|áº|á»/g) || []).length * 4;
+      }
+      function decode(buffer) {
+        const utf8 = new TextDecoder("utf-8").decode(buffer);
+        try {
+          const legacy = new TextDecoder("windows-1258").decode(buffer);
+          return score(utf8) <= score(legacy) ? { text: utf8, encoding: "UTF-8" } : { text: legacy, encoding: "Windows-1258" };
+        } catch { return { text: utf8, encoding: "UTF-8" }; }
+      }
+      function fileTitle(name) { return name.replace(/\.txt$/i, "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim(); }
+      function parseChapter(raw, name) {
+        const cleaned = raw.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").replace(/\u00a0/g, " ").replace(/[ \t]+$/gm, "").trim();
+        const lines = cleaned.split("\n").map((line) => line.trim());
+        const first = lines.findIndex(Boolean);
+        const firstLine = first >= 0 ? lines[first] : "";
+        const titleLike = /^(chương|chapter|hồi|quyển|phần|ngoại truyện)\b/i.test(firstLine) || (firstLine.length > 0 && firstLine.length <= 90 && lines[first + 1] === "");
+        const title = titleLike ? firstLine : (fileTitle(name) || "Chương chưa đặt tên");
+        const bodyLines = titleLike ? lines.slice(first + 1) : lines.slice(Math.max(first, 0));
+        while (bodyLines.length && !bodyLines[0]) bodyLines.shift();
+        while (bodyLines.length && !bodyLines[bodyLines.length - 1]) bodyLines.pop();
+        const nonEmpty = bodyLines.filter(Boolean);
+        const hasBreaks = bodyLines.length - nonEmpty.length >= Math.max(1, nonEmpty.length * .04);
+        const paragraphs = [];
+        if (hasBreaks) {
+          let group = [];
+          const flush = () => { const p = group.join(" ").replace(/\s+/g, " ").trim(); if (p) paragraphs.push(p); group = []; };
+          bodyLines.forEach((line) => { if (!line) flush(); else if (/^[—–-]\s|^[“\"']/.test(line) && group.length) { flush(); group.push(line); } else group.push(line); });
+          flush();
+        } else {
+          const wrapped = nonEmpty.length > 5 && nonEmpty.filter((line) => line.length >= 55 && line.length <= 100).length / nonEmpty.length > .62;
+          if (!wrapped) paragraphs.push(...nonEmpty);
+          else {
+            let group = "";
+            nonEmpty.forEach((line) => {
+              if (/^[—–-]\s|^[“\"']/.test(line) && group) { paragraphs.push(group.trim()); group = line; }
+              else group = (group + " " + line).trim();
+              if (/[.!?…][”\"']?$/.test(line) && group.length >= 140) { paragraphs.push(group); group = ""; }
+            });
+            if (group) paragraphs.push(group);
+          }
+        }
+        return { title, paragraphs };
+      }
+
+      function showError(message) { $("error").textContent = message; $("error").hidden = !message; }
+      function openText(text, name, key, encoding) {
+        const parsed = parseChapter(text, name);
+        if (!parsed.paragraphs.length) return showError("File này chưa có nội dung để hiển thị.");
+        showError(""); currentKey = key;
+        $("chapter-title").textContent = parsed.title;
+        chapterBody.replaceChildren(...parsed.paragraphs.map((text) => { const p = document.createElement("p"); p.textContent = text; return p; }));
+        const words = parsed.paragraphs.join(" ").trim().split(/\s+/).length;
+        $("word-count").textContent = words.toLocaleString("vi-VN") + " từ";
+        $("read-time").textContent = "Khoảng " + Math.max(1, Math.ceil(words / 220)) + " phút đọc";
+        $("encoding").textContent = encoding;
+        $("open-file").querySelector("span").textContent = "Đổi file";
+        welcome.hidden = true; reader.hidden = false; document.title = parsed.title + " — Mộc Đọc";
+        const saved = Number(storage.get("mocdoc-progress:" + key) || 0);
+        setTimeout(() => { const max = document.documentElement.scrollHeight - innerHeight; scrollTo({ top: saved > 1 ? max * saved / 100 : 0, behavior: "smooth" }); }, 60);
+      }
+      async function loadFile(file) {
+        if (!file) return;
+        if (!file.name.toLowerCase().endsWith(".txt")) return showError("Vui lòng chọn đúng file có đuôi .txt.");
+        if (file.size > 10 * 1024 * 1024) return showError("File lớn hơn 10 MB. Hãy chia thành từng chương nhỏ hơn.");
+        try { const decoded = decode(await file.arrayBuffer()); openText(decoded.text, file.name, `${file.name}:${file.size}:${file.lastModified}`, decoded.encoding); }
+        catch { showError("Không thể đọc file này. Vui lòng thử một file TXT khác."); }
+      }
+
+      const choose = () => input.click();
+      $("open-file").addEventListener("click", choose); $("next-file").addEventListener("click", choose);
+      $("drop-card").addEventListener("click", choose);
+      $("drop-card").addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); choose(); } });
+      input.addEventListener("change", () => { loadFile(input.files[0]); input.value = ""; });
+      $("sample").addEventListener("click", () => openText(sample, "chuong-mau.txt", "sample", "UTF-8"));
+      $("brand").addEventListener("click", () => scrollTo({ top: 0, behavior: "smooth" }));
+
+      document.querySelectorAll(".theme-button").forEach((button) => button.addEventListener("click", () => { settings.theme = button.dataset.theme; applySettings(); saveSettings(); }));
+      $("font-family").addEventListener("change", (event) => { settings.fontFamily = event.target.value; applySettings(); saveSettings(); });
+      $("font-down").addEventListener("click", () => { settings.fontSize = Math.max(16, settings.fontSize - 1); applySettings(); saveSettings(); });
+      $("font-up").addEventListener("click", () => { settings.fontSize = Math.min(30, settings.fontSize + 1); applySettings(); saveSettings(); });
+      $("width").addEventListener("input", (event) => { settings.width = Number(event.target.value); applySettings(); saveSettings(); });
+      $("leading").addEventListener("input", (event) => { settings.leading = Number(event.target.value); applySettings(); saveSettings(); });
+
+      addEventListener("scroll", () => {
+        const max = document.documentElement.scrollHeight - innerHeight;
+        const value = max > 0 ? Math.min(100, scrollY / max * 100) : 0;
+        $("progress").style.width = value + "%";
+        if (currentKey) storage.set("mocdoc-progress:" + currentKey, String(value));
+      }, { passive: true });
+      addEventListener("keydown", (event) => {
+        if (["INPUT","TEXTAREA"].includes(event.target.tagName)) return;
+        if (event.key.toLowerCase() === "o") { event.preventDefault(); choose(); }
+        if (event.key === "]") $("font-up").click();
+        if (event.key === "[") $("font-down").click();
+        if (event.key.toLowerCase() === "t") { const order = ["paper","sepia","night"]; settings.theme = order[(order.indexOf(settings.theme) + 1) % order.length]; applySettings(); saveSettings(); }
+      });
+      addEventListener("dragenter", (event) => { event.preventDefault(); dragDepth++; body.classList.add("dragging"); });
+      addEventListener("dragover", (event) => event.preventDefault());
+      addEventListener("dragleave", () => { dragDepth--; if (dragDepth <= 0) { dragDepth = 0; body.classList.remove("dragging"); } });
+      addEventListener("drop", (event) => { event.preventDefault(); dragDepth = 0; body.classList.remove("dragging"); loadFile(event.dataTransfer.files[0]); });
+    })();
+  </script>
+</body>
+</html>

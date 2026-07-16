@@ -11,6 +11,7 @@ import {
 } from "react";
 
 type Theme = "paper" | "sepia" | "night";
+type ReaderFont = "georgia" | "palatino" | "times" | "segoe" | "arial";
 
 type Chapter = {
   title: string;
@@ -38,6 +39,14 @@ const THEMES: { id: Theme; label: string; swatch: string }[] = [
   { id: "paper", label: "Sáng", swatch: "○" },
   { id: "sepia", label: "Sepia", swatch: "◐" },
   { id: "night", label: "Tối", swatch: "●" },
+];
+
+const READER_FONTS: { id: ReaderFont; label: string }[] = [
+  { id: "georgia", label: "Georgia" },
+  { id: "palatino", label: "Palatino" },
+  { id: "times", label: "Times New Roman" },
+  { id: "segoe", label: "Segoe UI" },
+  { id: "arial", label: "Arial" },
 ];
 
 function scoreDecodedText(text: string) {
@@ -155,34 +164,42 @@ export default function Home() {
   const [fontSize, setFontSize] = useState(20);
   const [lineHeight, setLineHeight] = useState(1.85);
   const [readerWidth, setReaderWidth] = useState(760);
-  const [fontStyle, setFontStyle] = useState<"serif" | "sans">("serif");
+  const [fontFamily, setFontFamily] = useState<ReaderFont>("georgia");
   const [progress, setProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState("");
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    let saved: Record<string, unknown> = {};
     try {
-      const saved = JSON.parse(localStorage.getItem("mocdoc-settings") || "{}");
-      if (THEMES.some((item) => item.id === saved.theme)) setTheme(saved.theme);
-      if (saved.fontSize >= 16 && saved.fontSize <= 30) setFontSize(saved.fontSize);
-      if (saved.lineHeight >= 1.45 && saved.lineHeight <= 2.2)
-        setLineHeight(saved.lineHeight);
-      if (saved.readerWidth >= 600 && saved.readerWidth <= 960)
-        setReaderWidth(saved.readerWidth);
-      if (saved.fontStyle === "serif" || saved.fontStyle === "sans")
-        setFontStyle(saved.fontStyle);
+      saved = JSON.parse(localStorage.getItem("mocdoc-settings") || "{}");
     } catch {
       // Keep the comfortable defaults if saved preferences are invalid.
     }
+    const timer = window.setTimeout(() => {
+      if (THEMES.some((item) => item.id === saved.theme)) setTheme(saved.theme as Theme);
+      if (typeof saved.fontSize === "number" && saved.fontSize >= 16 && saved.fontSize <= 30)
+        setFontSize(saved.fontSize);
+      if (typeof saved.lineHeight === "number" && saved.lineHeight >= 1.45 && saved.lineHeight <= 2.2)
+        setLineHeight(saved.lineHeight);
+      if (typeof saved.readerWidth === "number" && saved.readerWidth >= 600 && saved.readerWidth <= 960)
+        setReaderWidth(saved.readerWidth);
+      if (READER_FONTS.some((font) => font.id === saved.fontFamily))
+        setFontFamily(saved.fontFamily as ReaderFont);
+      setSettingsLoaded(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
+    if (!settingsLoaded) return;
     localStorage.setItem(
       "mocdoc-settings",
-      JSON.stringify({ theme, fontSize, lineHeight, readerWidth, fontStyle }),
+      JSON.stringify({ theme, fontSize, lineHeight, readerWidth, fontFamily }),
     );
-  }, [theme, fontSize, lineHeight, readerWidth, fontStyle]);
+  }, [theme, fontSize, lineHeight, readerWidth, fontFamily, settingsLoaded]);
 
   useEffect(() => {
     let frame = 0;
@@ -341,14 +358,18 @@ export default function Home() {
           </div>
 
           <span className="toolbar-divider" />
-          <button
-            className="tool-button type-button"
-            onClick={() => setFontStyle((style) => (style === "serif" ? "sans" : "serif"))}
-            title="Đổi kiểu chữ"
-            aria-label="Đổi kiểu chữ"
-          >
-            Aa
-          </button>
+          <label className="font-picker" title="Font đọc truyện">
+            <span className="visually-hidden">Font đọc truyện</span>
+            <select
+              value={fontFamily}
+              onChange={(event) => setFontFamily(event.target.value as ReaderFont)}
+              aria-label="Font đọc truyện"
+            >
+              {READER_FONTS.map((font) => (
+                <option key={font.id} value={font.id}>{font.label}</option>
+              ))}
+            </select>
+          </label>
           <button
             className="tool-button"
             onClick={() => setFontSize((size) => Math.max(16, size - 1))}
@@ -411,7 +432,7 @@ export default function Home() {
             </div>
           </section>
 
-          <article className={`chapter-body font-${fontStyle}`}>
+          <article className={`chapter-body font-${fontFamily}`}>
             {chapter.paragraphs.map((paragraph, index) => (
               <p key={`${index}-${paragraph.slice(0, 16)}`}>{paragraph}</p>
             ))}
