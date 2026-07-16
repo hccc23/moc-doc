@@ -14,6 +14,8 @@ Thư mục `local/` cũng là nguồn của bản GitHub Pages. Workflow `.githu
 
 File TXT được xử lý hoàn toàn trong trình duyệt. Nội dung truyện không được tải lên máy chủ và thư mục `Docs/` được loại khỏi Git.
 
+Lịch sử các phiên bản được ghi tại [`CHANGELOG.md`](CHANGELOG.md).
+
 ## Phát triển ứng dụng Sites
 
 Phiên bản React/Vinext nằm trong `app/`:
