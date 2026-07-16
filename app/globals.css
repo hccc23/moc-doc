@@ -172,9 +172,22 @@ button {
   transform: scale(0.92);
 }
 
-.type-button {
-  font-family: Georgia, serif;
-  font-weight: 700;
+.font-picker select {
+  width: 118px;
+  height: 32px;
+  padding: 0 25px 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--green-deep);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.font-picker select:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
 }
 
 .font-value {
@@ -491,12 +504,25 @@ button {
   text-rendering: optimizeLegibility;
 }
 
-.chapter-body.font-serif {
+.chapter-body.font-georgia {
   font-family: Georgia, "Times New Roman", "Noto Serif", serif;
 }
 
-.chapter-body.font-sans {
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+.chapter-body.font-palatino {
+  font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif;
+}
+
+.chapter-body.font-times {
+  font-family: "Times New Roman", Times, serif;
+}
+
+.chapter-body.font-segoe {
+  font-family: "Segoe UI", Tahoma, ui-sans-serif, sans-serif;
+  letter-spacing: 0.006em;
+}
+
+.chapter-body.font-arial {
+  font-family: Arial, Helvetica, ui-sans-serif, sans-serif;
   letter-spacing: 0.006em;
 }
 
@@ -694,6 +720,10 @@ button {
 
   .range-control {
     display: none;
+  }
+
+  .font-picker select {
+    width: 105px;
   }
 
   .toolbar {
